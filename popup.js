@@ -619,7 +619,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 document.getElementById('feedbackButton').addEventListener('click', () => {
     // Open GitHub issues page in a new tab
     chrome.tabs.create({
-        url: 'https://github.com/yourusername/time-tracker/issues/new/choose'
+        url: 'https://github.com/wtu4979/time-tracker/issues/new/choose'
     });
 });
 
