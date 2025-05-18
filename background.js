@@ -31,7 +31,17 @@ async function updateActiveTabs() {
         }
     });
     
-    console.log('Active tabs updated:', Array.from(newActiveTabs));
+    // Update time for any domains that are no longer active
+    const removedDomains = Array.from(activeTabs).filter(domain => !newActiveTabs.has(domain));
+    for (const domain of removedDomains) {
+        if (domain === currentDomain) {
+            await updateTime(domain);
+            currentDomain = null;
+            currentUrl = null;
+            startTime = null;
+        }
+    }
+    
     activeTabs = newActiveTabs;
     notifyPopup();
 }
@@ -50,29 +60,6 @@ function startPeriodicUpdates() {
     }
     updateInterval = setInterval(async () => {
         if (currentDomain && startTime) {
-            // Update lastVisit time for active domain
-            const data = await chrome.storage.local.get('timeData');
-            const timeData = data.timeData || {};
-            if (timeData[currentDomain]) {
-                const now = Date.now();
-                const today = new Date().toISOString().split('T')[0];
-                
-                timeData[currentDomain].lastVisit = new Date().toISOString();
-                timeData[currentDomain].timestamp = now;
-                
-                // Ensure daily stats structure exists
-                if (!timeData[currentDomain].dailyStats) {
-                    timeData[currentDomain].dailyStats = {};
-                }
-                if (!timeData[currentDomain].dailyStats[today]) {
-                    timeData[currentDomain].dailyStats[today] = {
-                        totalTime: 0,
-                        visits: 1
-                    };
-                }
-                
-                await chrome.storage.local.set({ timeData });
-            }
             notifyPopup();
         }
     }, 1000);
@@ -142,19 +129,32 @@ async function updateTime(domain) {
     notifyPopup();
 }
 
-// Update current tracking state
-async function updateTrackingState(url) {
-    if (!url || url.startsWith('chrome://')) return;
-
-    const newDomain = getDomain(url);
-    if (currentDomain !== newDomain) {
+// Handle tab switching
+async function handleTabSwitch(newUrl) {
+    if (!newUrl || newUrl.startsWith('chrome://')) {
         if (currentDomain) {
             await updateTime(currentDomain);
+            currentDomain = null;
+            currentUrl = null;
+            startTime = null;
         }
-        currentUrl = url;
+        return;
+    }
+
+    const newDomain = getDomain(newUrl);
+    
+    // If switching to a different domain, update the time for the current domain
+    if (currentDomain && currentDomain !== newDomain) {
+        await updateTime(currentDomain);
+    }
+    
+    // Only start tracking if the new domain is in active tabs
+    if (activeTabs.has(newDomain)) {
+        currentUrl = newUrl;
         currentDomain = newDomain;
+        startTime = Date.now();
         
-        // Get the current data for the domain
+        // Update visit count and last visit time
         const data = await chrome.storage.local.get('timeData');
         const timeData = data.timeData || {};
         const today = new Date().toISOString().split('T')[0];
@@ -172,7 +172,6 @@ async function updateTrackingState(url) {
                 }
             };
         } else {
-            // Update visit count for today
             if (!timeData[currentDomain].dailyStats) {
                 timeData[currentDomain].dailyStats = {};
             }
@@ -188,111 +187,81 @@ async function updateTrackingState(url) {
         }
         
         await chrome.storage.local.set({ timeData });
-        
-        // Start tracking from now
-        startTime = Date.now();
-        console.log('Now tracking:', currentDomain);
-        
-        // Update active tabs list
-        await updateActiveTabs();
+    } else {
+        currentUrl = null;
+        currentDomain = null;
+        startTime = null;
     }
+    
+    notifyPopup();
 }
 
 // Track active tab changes
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
-    console.log('Tab activated:', activeInfo);
     const tab = await chrome.tabs.get(activeInfo.tabId);
     if (tab.url) {
-        await updateTrackingState(tab.url);
+        await handleTabSwitch(tab.url);
     }
 });
 
 // Track URL changes in any tab
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.url) {
-        console.log('URL changed:', changeInfo.url);
         const activeTabs = await chrome.tabs.query({active: true, currentWindow: true});
         if (activeTabs[0]?.id === tabId) {
-            await updateTrackingState(changeInfo.url);
+            await handleTabSwitch(changeInfo.url);
         }
     }
-    // Update active tabs list when any tab updates
     await updateActiveTabs();
 });
 
 // Track tab removals
-chrome.tabs.onRemoved.addListener(async () => {
-    // Update the list of active tabs when a tab is closed
+chrome.tabs.onRemoved.addListener(async (tabId) => {
     await updateActiveTabs();
 });
 
 // Update time when window loses focus
 chrome.windows.onFocusChanged.addListener(async (windowId) => {
-    console.log('Window focus changed:', windowId);
     if (windowId === chrome.windows.WINDOW_ID_NONE) {
         if (currentDomain) {
             await updateTime(currentDomain);
             currentUrl = null;
             currentDomain = null;
             startTime = null;
-            console.log('Stopped tracking due to window blur');
             notifyPopup();
         }
     } else {
-        // Window gained focus, check current active tab
         const tabs = await chrome.tabs.query({active: true, currentWindow: true});
         if (tabs[0]?.url) {
-            await updateTrackingState(tabs[0].url);
+            await handleTabSwitch(tabs[0].url);
         }
     }
 });
-
-// Initialize tracking for the current active tab when extension loads
-chrome.tabs.query({}, async (tabs) => {
-    // Initialize activeTabs with all current tabs
-    tabs.forEach(tab => {
-        try {
-            if (tab.url) {
-                const domain = getDomain(tab.url);
-                activeTabs.add(domain);
-            }
-        } catch (e) {
-            console.error('Error processing tab:', e);
-        }
-    });
-
-    // Then initialize tracking for the active tab
-    const activeTabs = await chrome.tabs.query({active: true, currentWindow: true});
-    if (activeTabs[0]?.url) {
-        console.log('Extension loaded, starting to track:', activeTabs[0].url);
-        await updateTrackingState(activeTabs[0].url);
-    }
-});
-
-// Start periodic updates
-startPeriodicUpdates();
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "getState") {
         sendResponse({
-            currentUrl,
             currentDomain,
-            startTime: startTime || Date.now(), // Ensure we always have a start time for active domain
+            startTime,
             timestamp: Date.now(),
             activeTabs: Array.from(activeTabs)
         });
+        return true;
     } else if (message.type === "switchTab") {
-        // Handle tab switch request from popup
-        updateTrackingState(message.url);
-    } else if (message.type === "clearData") {
-        // Reset the start time when data is cleared
-        startTime = Date.now();
+        handleTabSwitch(message.url);
+        return true;
     } else if (message.type === "reopenPopup") {
-        // Wait a brief moment to ensure the popup is closed
-        setTimeout(() => {
-            chrome.action.openPopup();
-        }, 100);
+        chrome.action.openPopup();
+        return true;
     }
-    return true;
+});
+
+// Initialize tracking for the current active tab when extension loads
+chrome.tabs.query({active: true, currentWindow: true}, async (tabs) => {
+    if (tabs[0]?.url) {
+        await handleTabSwitch(tabs[0].url);
+    }
+    await updateActiveTabs();
+    startPeriodicUpdates();
 }); 

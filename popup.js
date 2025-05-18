@@ -43,6 +43,34 @@ function formatLastUpdated(timestamp) {
     return `${hours}:${minutes}:${seconds}`;
 }
 
+// Theme management
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const sunIcon = document.querySelector('.sun-icon');
+    const moonIcon = document.querySelector('.moon-icon');
+    
+    if (theme === 'dark') {
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = 'block';
+    } else {
+        sunIcon.style.display = 'block';
+        moonIcon.style.display = 'none';
+    }
+}
+
+async function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    setTheme(newTheme);
+    await chrome.storage.local.set({ theme: newTheme });
+}
+
+async function initializeTheme() {
+    const { theme } = await chrome.storage.local.get('theme');
+    setTheme(theme || 'light');
+}
+
 let activeTimers = {};
 let siteNames = new Map();
 let lastUpdate = 0;
@@ -160,8 +188,11 @@ async function deleteDomain(domain) {
 // Add this function near the top with the other utility functions
 async function switchToTab(domain) {
     try {
+        // Get all tabs
         const tabs = await chrome.tabs.query({});
-        const targetTab = tabs.find(tab => {
+        
+        // Filter tabs for the target domain
+        const matchingTabs = tabs.filter(tab => {
             try {
                 return new URL(tab.url).hostname === domain;
             } catch (e) {
@@ -169,31 +200,41 @@ async function switchToTab(domain) {
             }
         });
 
-        if (targetTab) {
-            // Update the active tab
-            await chrome.tabs.update(targetTab.id, { active: true });
+        if (matchingTabs.length > 0) {
+            // Sort tabs by last accessed time (most recent first)
+            matchingTabs.sort((a, b) => b.lastAccessed - a.lastAccessed);
+            
+            // Get the most recently accessed tab
+            const targetTab = matchingTabs[0];
+            
+            // First focus the window
             await chrome.windows.update(targetTab.windowId, { focused: true });
             
-            // Notify background script about the switch
+            // Then activate the tab
+            await chrome.tabs.update(targetTab.id, { active: true });
+            
+            // Notify background script about the switch with tabId
             await chrome.runtime.sendMessage({
                 type: "switchTab",
-                url: targetTab.url
+                url: targetTab.url,
+                tabId: targetTab.id
             });
-            
-            // Force immediate update of the popup
-            await displayTimeData(true);
+
+            // Close the popup after a short delay to ensure the switch completes
+            setTimeout(() => window.close(), 50);
         } else {
             // If no existing tab, open a new one
             const newTab = await chrome.tabs.create({ url: `https://${domain}` });
             
-            // Notify background script about the new tab
+            // Notify background script about the new tab with tabId
             await chrome.runtime.sendMessage({
                 type: "switchTab",
-                url: newTab.url
+                url: newTab.url,
+                tabId: newTab.id
             });
-            
-            // Force immediate update of the popup
-            await displayTimeData(true);
+
+            // Close the popup after a short delay
+            setTimeout(() => window.close(), 50);
         }
     } catch (e) {
         console.error('Error switching tab:', e);
@@ -279,7 +320,7 @@ async function updateSiteEntry(domain, data, activeDomain, backgroundState, skip
     
     const entry = existingEntry || document.createElement('div');
     entry.className = 'site-entry' + (skipAnimation ? '' : ' animate');
-    if (domain === activeDomain) {
+    if (domain === activeDomain && backgroundState.startTime) {
         entry.className += ' active';
     }
     
@@ -314,7 +355,7 @@ async function updateSiteEntry(domain, data, activeDomain, backgroundState, skip
     
     entry.innerHTML = `
         <div class="site-left">
-            <div class="favicon-container" title="Click to switch to this tab">
+            <div class="favicon-container">
                 <div class="site-icons">
                     <div class="favicon-wrapper">
                         <img class="favicon" src="${faviconUrl}" alt="Site icon" 
@@ -347,9 +388,8 @@ async function updateSiteEntry(domain, data, activeDomain, backgroundState, skip
         </div>
     `;
 
-    const faviconContainer = entry.querySelector('.favicon-container');
-    
     // Add hover handlers for tooltip
+    const faviconContainer = entry.querySelector('.favicon-container');
     faviconContainer.addEventListener('mouseenter', () => {
         showTooltip(`https://${domain}`, faviconContainer);
     });
@@ -358,9 +398,15 @@ async function updateSiteEntry(domain, data, activeDomain, backgroundState, skip
         hideTooltip();
     });
 
-    // Add click handler for the favicon container
-    faviconContainer.addEventListener('click', async () => {
-        await switchToTab(domain);
+    // Add click handler for the entire entry
+    entry.style.cursor = 'pointer';
+    entry.addEventListener('click', (e) => {
+        // Don't switch tab if clicking delete button or its container
+        if (e.target.closest('.delete-button') || e.target.closest('.site-right')) {
+            return;
+        }
+        // Call switchToTab without awaiting to prevent popup close
+        switchToTab(domain);
     });
 
     // Add delete button event listener
@@ -441,7 +487,21 @@ async function updateStorageDetails() {
     }
 }
 
-// Update the displayTimeData function to always put active site first
+// Helper function to create section header
+function createSectionHeader(text) {
+    const header = document.createElement('div');
+    header.className = 'section-header';
+    header.textContent = text;
+    header.style.padding = '12px 4px';
+    header.style.color = 'var(--text-secondary)';
+    header.style.fontSize = '12px';
+    header.style.fontWeight = '500';
+    header.style.textTransform = 'uppercase';
+    header.style.letterSpacing = '0.05em';
+    return header;
+}
+
+// Update the displayTimeData function to show all sites
 async function displayTimeData(forceUpdate = false) {
     // Throttle updates to prevent excessive refreshes
     const now = Date.now();
@@ -454,35 +514,29 @@ async function displayTimeData(forceUpdate = false) {
         const activeDomain = backgroundState.currentDomain;
         const activeTabDomains = new Set(backgroundState.activeTabs || []);
         
-        console.log('Active tabs received:', Array.from(activeTabDomains));
-        console.log('Current active domain:', activeDomain);
-        
         // Get time data
         const data = await chrome.storage.local.get('timeData');
         const timeData = data.timeData || {};
         cachedState = timeData;
         
-        console.log('Time data:', timeData);
-        
-        // Sort sites with active domain first, then by timestamp, but only for active tabs
+        // Sort all sites by last visit time, with active sites first
         const sortedSites = Object.entries(timeData)
-            .filter(([domain]) => {
-                const isActive = activeTabDomains.has(domain);
-                console.log(`Domain ${domain} active status:`, isActive);
-                return isActive;
-            })
             .sort(([domainA, a], [domainB, b]) => {
                 // Active domain always comes first
                 if (domainA === activeDomain) return -1;
                 if (domainB === activeDomain) return 1;
                 
-                // For non-active sites, sort by timestamp
+                // Then active tabs
+                const isActiveA = activeTabDomains.has(domainA);
+                const isActiveB = activeTabDomains.has(domainB);
+                if (isActiveA && !isActiveB) return -1;
+                if (!isActiveA && isActiveB) return 1;
+                
+                // Finally sort by timestamp
                 const timeA = a.timestamp || new Date(a.lastVisit).getTime();
                 const timeB = b.timestamp || new Date(b.lastVisit).getTime();
                 return timeB - timeA;
             });
-        
-        console.log('Sorted sites to display:', sortedSites);
         
         // Stop all existing timers
         stopAllTimers();
@@ -490,17 +544,36 @@ async function displayTimeData(forceUpdate = false) {
         // Clear existing entries
         const timeList = document.getElementById('timeList');
         timeList.innerHTML = '';
-        
-        // Update or create entries for each active site
-        for (const [domain, data] of sortedSites) {
-            await updateSiteEntry(domain, data, activeDomain, backgroundState, !forceUpdate);
+
+        // Split sites into active and inactive
+        const activeSites = sortedSites.filter(([domain]) => activeTabDomains.has(domain));
+        const inactiveSites = sortedSites.filter(([domain]) => !activeTabDomains.has(domain));
+
+        // Add Active Tabs section if there are any
+        if (activeSites.length > 0) {
+            timeList.appendChild(createSectionHeader('Active Tabs'));
+            for (const [domain, data] of activeSites) {
+                await updateSiteEntry(domain, data, activeDomain, backgroundState, !forceUpdate);
+            }
         }
 
-        // If no sites are displayed, show a message
+        // Add Inactive Tabs section if there are any
+        if (inactiveSites.length > 0) {
+            timeList.appendChild(createSectionHeader('Inactive Tabs'));
+            for (const [domain, data] of inactiveSites) {
+                await updateSiteEntry(domain, data, activeDomain, backgroundState, !forceUpdate);
+                const entry = document.querySelector(`[data-domain="${domain}"]`)?.closest('.site-entry');
+                if (entry) {
+                    entry.classList.add('inactive');
+                }
+            }
+        }
+
+        // If no sites at all, show a message
         if (sortedSites.length === 0) {
             timeList.innerHTML = `
-                <div class="no-sites-message" style="text-align: center; padding: 20px; color: #666;">
-                    No active tabs being tracked.
+                <div class="no-sites-message">
+                    No browsing history yet.
                     <br>
                     Visit some websites to start tracking time.
                 </div>
@@ -511,10 +584,9 @@ async function displayTimeData(forceUpdate = false) {
         await updateStorageDetails();
     } catch (e) {
         console.error('Error updating display:', e);
-        // Show error message in the popup
         const timeList = document.getElementById('timeList');
         timeList.innerHTML = `
-            <div class="error-message" style="text-align: center; padding: 20px; color: #ff4444;">
+            <div class="error-message">
                 Error updating display. Please try reopening the extension.
                 <br>
                 Error: ${e.message}
@@ -559,48 +631,79 @@ async function showCachedData() {
     }
 }
 
-// Update the clear data handler to also update storage details
-document.getElementById('clearData').addEventListener('click', async () => {
-    if (confirm('Are you sure you want to clear all tracking data?')) {
-        // Get the current state before clearing
-        const backgroundState = await chrome.runtime.sendMessage({type: "getState"});
-        
-        // Clear all data
-        await chrome.storage.local.clear();
-        stopAllTimers();
-        siteNames.clear();
-        cachedState = null;
-        
-        // If there's an active domain, immediately create new entry for it
-        if (backgroundState.currentDomain) {
-            const timeData = {
-                [backgroundState.currentDomain]: {
-                    totalTime: 0,
-                    lastVisit: new Date().toISOString(),
-                    timestamp: Date.now(),
-                    dailyStats: {
-                        [new Date().toISOString().split('T')[0]]: {
-                            totalTime: 0,
-                            visits: 1
-                        }
+// Update the clear data handler to use custom modal
+document.getElementById('clearData').addEventListener('click', () => {
+    const modal = document.getElementById('clearDataModal');
+    modal.style.display = 'flex';
+    setTimeout(() => modal.style.opacity = '1', 10);
+});
+
+document.getElementById('cancelClear').addEventListener('click', () => {
+    const modal = document.getElementById('clearDataModal');
+    modal.style.opacity = '0';
+    setTimeout(() => modal.style.display = 'none', 300);
+});
+
+document.getElementById('confirmClear').addEventListener('click', async () => {
+    const modal = document.getElementById('clearDataModal');
+    
+    // Get the current state before clearing
+    const backgroundState = await chrome.runtime.sendMessage({type: "getState"});
+    
+    // Clear all data
+    await chrome.storage.local.clear();
+    stopAllTimers();
+    siteNames.clear();
+    cachedState = null;
+    
+    // If there's an active domain, immediately create new entry for it
+    if (backgroundState.currentDomain) {
+        const timeData = {
+            [backgroundState.currentDomain]: {
+                totalTime: 0,
+                lastVisit: new Date().toISOString(),
+                timestamp: Date.now(),
+                dailyStats: {
+                    [new Date().toISOString().split('T')[0]]: {
+                        totalTime: 0,
+                        visits: 1
                     }
                 }
-            };
-            
-            // Save the new entry
-            await chrome.storage.local.set({ timeData });
-        }
+            }
+        };
         
-        // Send message to background script to reopen popup
-        await chrome.runtime.sendMessage({ type: "reopenPopup" });
-        
-        // Close the current popup
-        window.close();
+        // Save the new entry
+        await chrome.storage.local.set({ timeData });
+    }
+    
+    // Hide modal with animation
+    modal.style.opacity = '0';
+    setTimeout(() => modal.style.display = 'none', 300);
+    
+    // Send message to background script to reopen popup
+    await chrome.runtime.sendMessage({ type: "reopenPopup" });
+    
+    // Close the current popup
+    window.close();
+});
+
+// Add click handler to close modal when clicking overlay
+document.getElementById('clearDataModal').addEventListener('click', (e) => {
+    if (e.target.id === 'clearDataModal') {
+        e.target.style.opacity = '0';
+        setTimeout(() => e.target.style.display = 'none', 300);
     }
 });
 
 // Initialize display when popup opens
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize theme
+    initializeTheme();
+    
+    // Add theme toggle listener
+    const themeToggle = document.getElementById('themeToggle');
+    themeToggle.addEventListener('click', toggleTheme);
+    
     // Show cached data immediately
     showCachedData();
     // Then fetch latest data

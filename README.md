@@ -1,4 +1,4 @@
-# Time Tracker Chrome Extension
+# Trackly Chrome Extension
 
 A sleek and modern Chrome extension that helps you track time spent on different websites. Built with a focus on user experience and clean design.
 
@@ -18,14 +18,14 @@ A sleek and modern Chrome extension that helps you track time spent on different
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/time-tracker.git
+git clone https://github.com/yourusername/trackly.git
 ```
 
 2. Open Chrome and navigate to `chrome://extensions/`
 
 3. Enable "Developer mode" in the top right corner
 
-4. Click "Load unpacked" and select the `time-tracker` directory
+4. Click "Load unpacked" and select the `trackly` directory
 
 ## Usage
 
@@ -43,7 +43,7 @@ The extension is built with vanilla JavaScript and uses Chrome's Storage API for
 ### Project Structure
 
 ```
-time-tracker/
+trackly/
 ├── manifest.json        # Extension configuration
 ├── popup.html          # Main popup interface
 ├── popup.js            # Popup functionality

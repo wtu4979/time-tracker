@@ -1,28 +1,89 @@
 <!DOCTYPE html>
-<html>
+<html data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <title>Time Tracker</title>
+    <title>Trackly</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        :root[data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --border-color: #eaecef;
+            --text-primary: #1a1a1a;
+            --text-secondary: #64748b;
+            --hover-bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --card-border: #eaecef;
+            --delete-hover: #fee2e2;
+            --delete-icon: #ef4444;
+            --tooltip-bg: #27272a;
+            --tooltip-text: #ffffff;
+            --undo-bg: #1e293b;
+            --undo-text: #ffffff;
+            --undo-button: #334155;
+            --undo-button-hover: #475569;
+            --scrollbar-track: #f1f5f9;
+            --scrollbar-thumb: #cbd5e1;
+            --scrollbar-hover: #94a3b8;
+            --button-bg: #f1f5f9;
+            --button-text: #64748b;
+            --button-hover-bg: #e2e8f0;
+            --button-hover-text: #475569;
+        }
+
+        :root[data-theme="dark"] {
+            --bg-primary: #111111;
+            --bg-secondary: #1a1a1a;
+            --border-color: #2a2a2a;
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            --hover-bg: #222222;
+            --card-bg: #1a1a1a;
+            --card-border: #2a2a2a;
+            --delete-hover: #7f1d1d;
+            --delete-icon: #ef4444;
+            --tooltip-bg: #ffffff;
+            --tooltip-text: #1a1a1a;
+            --undo-bg: #2a2a2a;
+            --undo-text: #ffffff;
+            --undo-button: #3a3a3a;
+            --undo-button-hover: #4a4a4a;
+            --scrollbar-track: #1a1a1a;
+            --scrollbar-thumb: #2a2a2a;
+            --scrollbar-hover: #3a3a3a;
+            --button-bg: #2a2a2a;
+            --button-text: #a1a1aa;
+            --button-hover-bg: #3a3a3a;
+            --button-hover-text: #ffffff;
+        }
+
         body {
             width: 320px;
             margin: 0;
             padding: 0;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #ffffff;
-            color: #1a1a1a;
+            background: var(--bg-primary);
+            color: var(--text-primary);
         }
 
         .header {
             padding: 16px 20px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #eaecef;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
             position: sticky;
             top: 0;
             z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-icon {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
         }
 
         .title {
@@ -31,13 +92,17 @@
             color: #0f172a;
             margin: 0;
             letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .content {
             max-height: 400px;
             overflow-y: auto;
             padding: 12px;
-            background: #ffffff;
+            background: var(--bg-primary);
         }
 
         .site-entry {
@@ -46,21 +111,42 @@
             justify-content: space-between;
             padding: 12px;
             margin: 8px 0;
-            background: #ffffff;
-            border: 1px solid #eaecef;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
             border-radius: 8px;
             transition: all 0.2s ease;
+            color: var(--text-primary);
+            cursor: pointer;
         }
 
         .site-entry:hover {
-            border-color: #d0d7de;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border-color: var(--border-color);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
             transform: translateY(-1px);
         }
 
         .site-entry.active {
-            background: #f8fafc;
+            background: var(--bg-secondary);
             border-color: #0ea5e9;
+        }
+
+        .site-entry.active:hover {
+            border-color: #0ea5e9;
+            transform: translateY(-1px);
+        }
+
+        .site-entry.inactive {
+            opacity: 0.7;
+            background: var(--bg-primary);
+        }
+
+        .site-entry.inactive:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .site-entry.inactive .site-time {
+            color: var(--text-secondary);
         }
 
         .site-left {
@@ -86,7 +172,7 @@
         }
 
         .favicon-container:hover {
-            background: #f1f5f9;
+            background: var(--hover-bg);
         }
 
         .site-icons {
@@ -135,12 +221,12 @@
         }
 
         .label {
-            color: #64748b;
+            color: var(--text-secondary);
             font-weight: 500;
         }
 
         .site-time {
-            color: #0f172a;
+            color: var(--text-primary);
             font-weight: 500;
         }
 
@@ -149,7 +235,7 @@
         }
 
         .last-visit {
-            color: #64748b;
+            color: var(--text-secondary);
         }
 
         .delete-button {
@@ -162,21 +248,21 @@
 
         .delete-button:hover {
             opacity: 1;
-            background: #fee2e2;
+            background: var(--delete-hover);
         }
 
         .delete-button svg {
             width: 18px;
             height: 18px;
-            fill: #ef4444;
+            fill: var(--delete-icon);
         }
 
         .footer {
             padding: 12px 16px;
-            background: #f8f9fa;
-            border-top: 1px solid #eaecef;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
             font-size: 12px;
-            color: #64748b;
+            color: var(--text-secondary);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -194,14 +280,14 @@
         }
 
         .footer-label {
-            color: #94a3b8;
+            color: var(--text-secondary);
         }
 
-        #clearData {
+        #clearData, #feedbackButton {
             padding: 6px 12px;
             border: none;
-            background: #f1f5f9;
-            color: #64748b;
+            background: var(--button-bg);
+            color: var(--button-text);
             border-radius: 6px;
             cursor: pointer;
             font-family: inherit;
@@ -210,34 +296,22 @@
             transition: all 0.2s ease;
         }
 
-        #clearData:hover {
-            background: #e2e8f0;
-            color: #475569;
+        #clearData:hover, #feedbackButton:hover {
+            background: var(--button-hover-bg);
+            color: var(--button-hover-text);
         }
 
         #feedbackButton {
-            padding: 6px 12px;
-            border: none;
-            background: #f0f9ff;
-            color: #0ea5e9;
-            border-radius: 6px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 12px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-
-        #feedbackButton:hover {
-            background: #e0f2fe;
+            background: var(--button-bg);
+            color: var(--button-text);
         }
 
         .buttons {
             display: flex;
             gap: 8px;
             padding: 12px 16px;
-            background: #ffffff;
-            border-top: 1px solid #eaecef;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border-color);
         }
 
         .tooltip-container {
@@ -329,21 +403,17 @@
 
         .no-sites-message {
             text-align: center;
-            padding: 32px 20px;
-            color: #64748b;
-            font-size: 14px;
-            line-height: 1.6;
+            padding: 20px;
+            color: var(--text-secondary);
         }
 
         .error-message {
             text-align: center;
-            padding: 32px 20px;
+            padding: 20px;
             color: #ef4444;
-            font-size: 14px;
-            line-height: 1.6;
-            background: #fef2f2;
+            background: var(--bg-secondary);
             border-radius: 8px;
-            margin: 16px;
+            margin: 8px;
         }
 
         /* Custom scrollbar */
@@ -352,22 +422,158 @@
         }
 
         ::-webkit-scrollbar-track {
-            background: #f1f5f9;
+            background: var(--scrollbar-track);
         }
 
         ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
+            background: var(--scrollbar-thumb);
             border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
+            background: var(--scrollbar-hover);
+        }
+
+        .theme-toggle {
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            margin-left: auto;
+        }
+
+        .theme-toggle:hover {
+            background: var(--hover-bg);
+        }
+
+        .theme-toggle svg {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: var(--text-primary);
+            stroke-width: 2;
+            transition: all 0.2s ease;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            width: 280px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay[style*="flex"] .modal {
+            transform: translateY(0);
+        }
+
+        .modal-icon {
+            width: 48px;
+            height: 48px;
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: center;
+            margin: 0;
+        }
+
+        .modal-message {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        .modal-button {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .modal-button.cancel {
+            background: var(--button-bg);
+            color: var(--button-text);
+        }
+
+        .modal-button.cancel:hover {
+            background: var(--button-hover-bg);
+            color: var(--button-hover-text);
+        }
+
+        .modal-button.confirm {
+            background: #ef4444;
+            color: #ffffff;
+        }
+
+        .modal-button.confirm:hover {
+            background: #dc2626;
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1 class="title">Time Tracker</h1>
+        <img src="icons/icon48.png" alt="Trackly" class="header-icon">
+        <h1 class="title">Trackly</h1>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+            <svg class="sun-icon" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="moon-icon" viewBox="0 0 24 24" style="display: none;">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+        </button>
     </div>
     
     <div class="content">
@@ -400,6 +606,18 @@
         <span class="undo-text"></span>
         <button class="undo-button">Undo</button>
         <div class="progress-bar"></div>
+    </div>
+
+    <div class="modal-overlay" id="clearDataModal">
+        <div class="modal">
+            <img src="icons/icon48.png" alt="Trackly" class="modal-icon">
+            <h2 class="modal-title">Clear All Data</h2>
+            <p class="modal-message">Are you sure you want to clear all tracking data? This action cannot be undone.</p>
+            <div class="modal-buttons">
+                <button class="modal-button cancel" id="cancelClear">Cancel</button>
+                <button class="modal-button confirm" id="confirmClear">Clear All</button>
+            </div>
+        </div>
     </div>
 
     <script src="popup.js"></script>
