@@ -1,0 +1,23 @@
+{
+  "name": "time-tracker",
+  "version": "1.0.0",
+  "description": "A sleek and modern Chrome extension that helps you track time spent on different websites. Built with a focus on user experience and clean design.",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wtu4979/time-tracker.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/wtu4979/time-tracker/issues"
+  },
+  "homepage": "https://github.com/wtu4979/time-tracker#readme",
+  "dependencies": {
+    "sharp": "^0.34.1"
+  }
+}

@@ -1,0 +1,23 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background circle -->
+    <circle cx="64" cy="64" r="60" fill="#0EA5E9" />
+    
+    <!-- Inner circle -->
+    <circle cx="64" cy="64" r="54" fill="#F0F9FF" />
+    
+    <!-- Clock hands container -->
+    <g transform="translate(64 64)">
+        <!-- Hour markers -->
+        <rect x="-2" y="-36" width="4" height="12" fill="#0EA5E9" />
+        <rect x="-2" y="24" width="4" height="12" fill="#0EA5E9" />
+        <rect x="-36" y="-2" width="12" height="4" fill="#0EA5E9" />
+        <rect x="24" y="-2" width="12" height="4" fill="#0EA5E9" />
+        
+        <!-- Clock hands -->
+        <rect x="-2" y="-28" width="4" height="32" fill="#0EA5E9" transform="rotate(-45)" />
+        <rect x="-1" y="-20" width="2" height="24" fill="#0EA5E9" transform="rotate(75)" />
+    </g>
+    
+    <!-- Center dot -->
+    <circle cx="64" cy="64" r="4" fill="#0EA5E9" />
+</svg> 
